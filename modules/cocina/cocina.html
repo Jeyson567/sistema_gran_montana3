@@ -1,0 +1,27 @@
+﻿<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cocina | GRAN MONTANA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/kitchen.css" />
+  </head>
+  <body class="bg-black text-zinc-100 min-h-screen">
+    <div class="flex min-h-screen">
+      <aside id="sidebar" class="w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col shrink-0 hidden lg:flex"></aside>
+      <main class="flex-1 p-4 min-h-screen">
+        <header class="mb-4 flex flex-wrap justify-between items-center gap-2">
+          <h1 class="text-3xl font-bold">Monitor Cocina</h1>
+          <p id="kitchen-status" class="text-orange-400 font-semibold">0 pedidos</p>
+        </header>
+        <section id="kitchen-board" class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"></section>
+      </main>
+    </div>
+    <!-- Sonido opcional: coloque new-order.mp3 en /sounds/; si no existe, se usa pitido del sistema -->
+    <audio id="new-order-sound" src="../../sounds/new-order.mp3" preload="auto"></audio>
+    <div id="toast-root" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    <script type="module" src="./cocina.js"></script>
+  </body>
+</html>

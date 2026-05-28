@@ -1,0 +1,101 @@
+.mesa-card-btn {
+  cursor: pointer;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  border: 2px solid rgb(63 63 70);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.mesa-card-btn:hover {
+  transform: translateY(-4px);
+  border-color: rgb(249 115 22);
+  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.15);
+}
+
+.mesa-card-btn:active {
+  transform: translateY(-1px);
+}
+
+.mesa-card-btn .mesa-tap-hint {
+  font-size: 0.75rem;
+  color: rgb(161 161 170);
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.producto-pos-btn {
+  cursor: pointer;
+  min-height: 5.5rem;
+  border-radius: 1rem;
+  border: 2px solid rgb(63 63 70);
+  background: rgb(24 24 27);
+  padding: 1rem;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.producto-pos-btn:hover {
+  border-color: rgb(249 115 22);
+  background: rgb(39 39 42);
+  transform: scale(1.02);
+}
+
+.producto-pos-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cat-tab {
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+
+.cat-tab.active {
+  background: rgb(234 88 12);
+  color: white;
+}
+
+.cat-tab:not(.active) {
+  background: rgb(39 39 42);
+}
+
+.linea-pedido {
+  border-radius: 0.75rem;
+  border: 1px solid rgb(63 63 70);
+  padding: 0.75rem;
+  background: rgb(24 24 27);
+}
+
+.pos-search-sticky {
+  position: sticky;
+  top: 0;
+}
+
+.pos-search-input {
+  font-size: 1rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-color: rgb(249 115 22 / 0.35);
+}
+
+.pos-search-input:focus {
+  border-color: rgb(249 115 22);
+  box-shadow: 0 0 0 2px rgb(249 115 22 / 0.2);
+}
+
+.pos-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgb(161 161 170);
+  font-size: 1.1rem;
+  pointer-events: none;
+}
