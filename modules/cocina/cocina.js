@@ -85,10 +85,14 @@ const renderBoard = () => {
   board.innerHTML = pedidosCache
     .map((p) => {
       const badge = estadoBadge(p.estado);
+      const agregado = p.esAgregado
+        ? '<p class="text-yellow-400 text-sm font-bold uppercase tracking-wide mb-1">Nuevo agregado</p>'
+        : "";
       return `
         <article class="kitchen-card rounded-2xl border-2 border-zinc-700 bg-zinc-900 p-5 ${p.estado === "pendiente" ? "ring-2 ring-orange-500" : ""}">
           <div class="flex justify-between items-start gap-2 mb-3">
             <div>
+              ${agregado}
               <h3 class="text-2xl font-bold">${escapeHtml(p.mesa ?? "Mesa")}</h3>
               <p class="text-zinc-400 text-sm">${escapeHtml(p.hora ?? "")} · ${escapeHtml(p.fecha ?? "")}</p>
             </div>

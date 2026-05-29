@@ -121,8 +121,36 @@ export const getMesa = async (mesaId) => {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };
 
-export const updatePedidoEstado = async (pedidoId, estado) =>
-  updateDoc(doc(db, colecciones.pedidos, pedidoId), { estado });
+export const updatePedidoEstado = async (pedidoId, estado) => {
+  const pedidoRef = doc(db, colecciones.pedidos, pedidoId);
+  const pedidoSnap = await getDoc(pedidoRef);
+  await updateDoc(pedidoRef, { estado });
+
+  if (!pedidoSnap.exists()) return;
+
+  const pedido = pedidoSnap.data();
+  const mesaId = pedido?.mesaId;
+  const lineaIds =
+    pedido?.lineaIds ??
+    (pedido?.productos ?? []).map((p) => p.lineaId).filter(Boolean);
+
+  if (!mesaId || !lineaIds?.length) return;
+
+  const mesaRef = doc(db, colecciones.mesas, mesaId);
+  const mesaSnap = await getDoc(mesaRef);
+  if (!mesaSnap.exists()) return;
+
+  const carrito = mesaSnap.data()?.carrito ?? [];
+  const estadoLinea =
+    estado === "entregado" ? "entregado" : estado === "listo" ? "listo" : estado;
+
+  const idsSet = new Set(lineaIds);
+  const carritoActualizado = carrito.map((linea) =>
+    idsSet.has(linea.lineaId) ? { ...linea, estadoCocina: estadoLinea } : linea
+  );
+
+  await updateDoc(mesaRef, { carrito: carritoActualizado });
+};
 
 export const getProductosDisponibles = async () => {
   const snap = await getDocs(query(collection(db, colecciones.productos), where("disponible", "==", true), orderBy("nombre", "asc")));

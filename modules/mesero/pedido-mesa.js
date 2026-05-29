@@ -8,6 +8,15 @@ import {
 } from "../../firebase/firestore.js";
 import { openFormModal } from "../../components/modal.js";
 import { formatCurrency, escapeHtml, safeText, toNumber, normalizeRecord } from "../../js/helpers.js";
+import {
+  newLineaId,
+  normalizarCarrito,
+  normalizarLineaCarrito,
+  lineasPendientesEnvio,
+  lineaEstaEnviada,
+  etiquetaEstadoCocina,
+  claseBadgeCocina
+} from "../../js/pedido-lineas.js";
 import { alertSuccess, alertError } from "../../js/alerts.js";
 import { mostrarPedido } from "./mesero.js";
 
@@ -79,29 +88,40 @@ const renderLineas = () => {
       const badge = linea.esAdicional
         ? '<span class="text-xs bg-yellow-600/30 text-yellow-300 px-2 py-0.5 rounded ml-1">Adicional</span>'
         : "";
-      const qtyControls = linea.esAdicional
+      const estadoLbl = etiquetaEstadoCocina(linea);
+      const estadoBadge = estadoLbl
+        ? `<span class="text-xs px-2 py-0.5 rounded ml-1 ${claseBadgeCocina(linea)}">${estadoLbl}</span>`
+        : "";
+      const bloqueado = lineaEstaEnviada(linea);
+      const qtyControls = bloqueado
         ? `<span class="text-sm text-zinc-400">Cant. ${linea.cantidad}</span>`
-        : `
+        : linea.esAdicional
+          ? `<span class="text-sm text-zinc-400">Cant. ${linea.cantidad}</span>`
+          : `
         <button type="button" class="btn-secondary px-3 py-1 text-lg" data-qty-minus="${index}">−</button>
         <span class="min-w-[2rem] text-center font-bold text-lg">${linea.cantidad}</span>
         <button type="button" class="btn-secondary px-3 py-1 text-lg" data-qty-plus="${index}">+</button>`;
 
+      const btnQuitar = bloqueado
+        ? ""
+        : `<button type="button" class="btn-danger ml-auto text-sm px-3 py-1" data-qty-remove="${index}">Quitar</button>`;
+
       return `
-      <div class="linea-pedido ${linea.esAdicional ? "border-yellow-600/40" : ""}" data-linea-index="${index}">
+      <div class="linea-pedido ${linea.esAdicional ? "border-yellow-600/40" : ""} ${bloqueado ? "opacity-90" : ""}" data-linea-index="${index}">
         <div class="flex justify-between items-start gap-2">
           <div>
-            <p class="font-bold">${escapeHtml(linea.nombre)}${badge}</p>
+            <p class="font-bold">${escapeHtml(linea.nombre)}${badge}${estadoBadge}</p>
             <p class="text-sm text-orange-400">${formatCurrency(linea.precio)} c/u</p>
           </div>
           <p class="font-bold">${formatCurrency(linea.subtotal)}</p>
         </div>
         <div class="flex items-center gap-2 mt-2">
           ${qtyControls}
-          <button type="button" class="btn-danger ml-auto text-sm px-3 py-1" data-qty-remove="${index}">Quitar</button>
+          ${btnQuitar}
         </div>
         ${linea.notas ? `<p class="text-xs text-zinc-400 mt-1">${escapeHtml(linea.notas)}</p>` : ""}
         ${
-          !linea.esAdicional
+          !linea.esAdicional && !bloqueado
             ? `<input type="text" class="input-base mt-2 text-sm" data-nota-linea="${index}" placeholder="Nota: sin hielo, bien cocido..." value="${escapeHtml(linea.notas ?? "")}" />`
             : ""
         }
@@ -179,21 +199,30 @@ const agregarProducto = (productoId) => {
   if (!p) return;
 
   const existente = carrito.findIndex(
-    (l) => l.productoId === p.id && !l.esAdicional && !l.notas
+    (l) =>
+      l.productoId === p.id &&
+      !l.esAdicional &&
+      !l.notas &&
+      !lineaEstaEnviada(l)
   );
   if (existente >= 0) {
     carrito[existente].cantidad = toNumber(carrito[existente].cantidad, 1) + 1;
     carrito[existente] = recalcularLinea(carrito[existente]);
   } else {
     carrito.push(
-      recalcularLinea({
-        productoId: p.id,
-        nombre: p.nombre,
-        precio: p.precio,
-        cantidad: 1,
-        notas: "",
-        subtotal: p.precio
-      })
+      normalizarLineaCarrito(
+        recalcularLinea({
+          lineaId: newLineaId(),
+          productoId: p.id,
+          nombre: p.nombre,
+          precio: p.precio,
+          cantidad: 1,
+          notas: "",
+          subtotal: p.precio,
+          enviadoCocina: false,
+          estadoCocina: null
+        })
+      )
     );
   }
 
@@ -256,14 +285,19 @@ const openProductoAdicionalModal = () => {
 
       if (!nombre) throw new Error("Indica el nombre del producto");
 
-      const linea = recalcularLinea({
-        esAdicional: true,
-        nombre,
-        precio,
-        cantidad: 1,
-        notas: comentario,
-        subtotal: precio
-      });
+      const linea = normalizarLineaCarrito(
+        recalcularLinea({
+          lineaId: newLineaId(),
+          esAdicional: true,
+          nombre,
+          precio,
+          cantidad: 1,
+          notas: comentario,
+          subtotal: precio,
+          enviadoCocina: false,
+          estadoCocina: null
+        })
+      );
 
       if (descontar) {
         const inventarioId = fd.get("inventarioId");
@@ -298,7 +332,7 @@ const openProductoAdicionalModal = () => {
 export const abrirVistaPedido = (mesa, profile) => {
   mesaActiva = normalizeRecord(mesa);
   profileActivo = profile;
-  carrito = Array.isArray(mesaActiva.carrito) ? [...mesaActiva.carrito] : [];
+  carrito = normalizarCarrito(mesaActiva.carrito);
   categoriaActiva = "todas";
   busquedaProducto = "";
 
@@ -323,17 +357,29 @@ export const abrirVistaPedido = (mesa, profile) => {
 };
 
 const enviarCocina = async () => {
-  if (!carrito.length) {
-    alertError("Agrega productos antes de enviar a cocina");
+  const pendientes = lineasPendientesEnvio(carrito);
+  if (!pendientes.length) {
+    alertError("No hay productos nuevos para enviar a cocina");
     return;
   }
 
   const notasMesa = document.getElementById("pedido-notas-mesa")?.value ?? "";
+  const yaHabiaEnviados = carrito.some((l) => l.enviadoCocina);
+
+  const productosEnvio = pendientes.map((l) => ({
+    ...l,
+    enviadoCocina: true,
+    estadoCocina: "pendiente"
+  }));
+
+  const lineaIds = productosEnvio.map((l) => l.lineaId);
 
   await savePedido({
     mesa: mesaActiva.numero,
     mesaId: mesaActiva.id,
-    productos: carrito.map((l) => ({ ...l })),
+    productos: productosEnvio,
+    lineaIds,
+    esAgregado: yaHabiaEnviados,
     notas: safeText(notasMesa),
     estado: "pendiente",
     mesero: profileActivo?.nombre ?? "",
@@ -343,13 +389,29 @@ const enviarCocina = async () => {
     timestamp: Date.now()
   });
 
+  const idsEnviados = new Set(lineaIds);
+  carrito = carrito.map((l) =>
+    idsEnviados.has(l.lineaId)
+      ? { ...l, enviadoCocina: true, estadoCocina: "pendiente" }
+      : l
+  );
+
   await updateMesa(mesaActiva.id, {
+    carrito,
+    total: calcularTotal(carrito),
     estado: "ocupada",
     notasPedido: safeText(notasMesa),
     ultimoEnvioCocina: new Date().toISOString()
   });
+  mesaActiva = { ...mesaActiva, carrito, total: calcularTotal(carrito) };
 
-  alertSuccess("Pedido enviado a cocina");
+  renderLineas();
+  const n = pendientes.length;
+  alertSuccess(
+    yaHabiaEnviados
+      ? `Nuevo agregado enviado (${n} producto${n > 1 ? "s" : ""})`
+      : `Pedido enviado a cocina (${n} producto${n > 1 ? "s" : ""})`
+  );
 };
 
 const irCobrar = async () => {
@@ -409,7 +471,7 @@ export const initPedidoMesa = ({ profile, onVolver }) => {
 
     if (minus) {
       const i = Number(minus.dataset.qtyMinus);
-      if (!carrito[i] || carrito[i].esAdicional) return;
+      if (!carrito[i] || carrito[i].esAdicional || lineaEstaEnviada(carrito[i])) return;
       if (carrito[i].cantidad > 1) {
         carrito[i].cantidad--;
         carrito[i] = recalcularLinea(carrito[i]);
@@ -421,14 +483,16 @@ export const initPedidoMesa = ({ profile, onVolver }) => {
     }
     if (plus) {
       const i = Number(plus.dataset.qtyPlus);
-      if (!carrito[i] || carrito[i].esAdicional) return;
+      if (!carrito[i] || carrito[i].esAdicional || lineaEstaEnviada(carrito[i])) return;
       carrito[i].cantidad++;
       carrito[i] = recalcularLinea(carrito[i]);
       renderLineas();
       syncMesaFirestore().catch(() => {});
     }
     if (remove) {
-      carrito.splice(Number(remove.dataset.qtyRemove), 1);
+      const i = Number(remove.dataset.qtyRemove);
+      if (lineaEstaEnviada(carrito[i])) return;
+      carrito.splice(i, 1);
       renderLineas();
       syncMesaFirestore().catch(() => {});
     }
