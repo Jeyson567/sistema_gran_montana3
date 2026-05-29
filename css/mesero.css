@@ -1,11 +1,13 @@
 .mesa-card-btn {
   cursor: pointer;
   border-radius: 1rem;
-  padding: 1.25rem;
+  padding: 1rem 1.1rem;
+  min-height: 5.75rem;
   border: 2px solid rgb(63 63 70);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   text-align: left;
   width: 100%;
+  touch-action: manipulation;
 }
 
 .mesa-card-btn:hover {
@@ -29,13 +31,57 @@
 
 .producto-pos-btn {
   cursor: pointer;
-  min-height: 5.5rem;
+  min-height: 5.75rem;
   border-radius: 1rem;
   border: 2px solid rgb(63 63 70);
   background: rgb(24 24 27);
   padding: 1rem;
   text-align: left;
   transition: all 0.15s ease;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+#pedido-productos {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  #pedido-productos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  #pedido-productos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  #pedido-productos {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  #view-pedido > .grid {
+    grid-template-columns: 1fr !important;
+    overflow-y: auto;
+    height: auto;
+    max-height: none;
+  }
+
+  #view-pedido {
+    overflow-y: auto;
+  }
+
+  .cat-tab {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
 }
 
 .producto-pos-btn:hover {
@@ -76,6 +122,13 @@
 .pos-search-sticky {
   position: sticky;
   top: 0;
+  z-index: 5;
+}
+
+@media (max-width: 767px) {
+  .pos-search-sticky {
+    top: 0;
+  }
 }
 
 .pos-search-input {

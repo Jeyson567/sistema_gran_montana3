@@ -6,23 +6,32 @@
     <title>Caja | GRAN MONTANA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
     <link rel="stylesheet" href="../../css/tickets.css" />
   </head>
-  <body class="bg-zinc-950 text-zinc-100 min-h-screen">
-    <div class="flex min-h-screen">
-      <aside id="sidebar" class="w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col shrink-0"></aside>
-      <main class="flex-1 p-6 overflow-auto">
+  <body class="bg-zinc-950 text-zinc-100 min-h-screen app-body">
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <div class="app-shell">
+      <aside id="sidebar" class="app-sidebar"></aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <button type="button" id="sidebar-toggle" class="app-menu-btn" aria-expanded="false" aria-controls="sidebar">
+            <span aria-hidden="true">☰</span> Menú
+          </button>
+          <span class="app-topbar-title">Caja</span>
+        </header>
+      <main class="app-content flex-1 p-4 sm:p-6 overflow-auto">
         <h1 class="text-2xl font-bold mb-2">Caja</h1>
         <p class="text-zinc-400 mb-6">Cobro de mesas — propina manual</p>
 
         <section id="view-cobros">
           <h2 class="text-lg font-semibold mb-3">Mesas por cobrar</h2>
-          <div id="cashier-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+          <div id="cashier-list" class="cashier-grid"></div>
         </section>
 
         <section id="view-historial" class="hidden mt-8">
           <h2 class="text-lg font-semibold mb-3">Historial de tickets</h2>
-          <div class="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+          <div class="table-scroll-wrap rounded-2xl border border-zinc-800 bg-zinc-900">
             <table class="w-full text-sm">
               <thead class="text-zinc-400 border-b border-zinc-800">
                 <tr>
@@ -40,6 +49,7 @@
           </div>
         </section>
       </main>
+      </div>
     </div>
     <div id="toast-root" class="fixed top-4 right-4 z-[60] space-y-2"></div>
     <script type="module" src="./caja.js"></script>

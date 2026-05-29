@@ -6,13 +6,22 @@
     <title>Reimpresión tickets | GRAN MONTANA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
     <link rel="stylesheet" href="../../css/tickets.css" />
     <link rel="stylesheet" href="../../css/reimpresion.css" />
   </head>
-  <body class="bg-zinc-950 text-zinc-100 min-h-screen">
-    <div class="flex min-h-screen">
-      <aside id="sidebar" class="w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col shrink-0"></aside>
-      <main class="flex-1 p-4 overflow-auto">
+  <body class="bg-zinc-950 text-zinc-100 min-h-screen app-body">
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <div class="app-shell">
+      <aside id="sidebar" class="app-sidebar"></aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <button type="button" id="sidebar-toggle" class="app-menu-btn" aria-expanded="false" aria-controls="sidebar">
+            <span aria-hidden="true">☰</span> Menú
+          </button>
+          <span class="app-topbar-title">Tickets</span>
+        </header>
+      <main class="app-content flex-1 p-4 overflow-auto">
         <header class="mb-6">
           <h1 class="text-2xl font-bold">Reimpresión de tickets</h1>
           <p class="text-zinc-400 mt-1">Busca ventas anteriores y reimprime en formato 80mm</p>
@@ -58,7 +67,7 @@
           <p id="reimp-contador" class="text-sm text-zinc-500 mt-3">0 tickets</p>
         </section>
 
-        <div class="overflow-x-auto rounded-2xl border border-zinc-800">
+        <div class="table-scroll-wrap rounded-2xl border border-zinc-800">
           <table class="w-full text-sm">
             <thead class="bg-zinc-900 text-zinc-400">
               <tr>
@@ -77,6 +86,7 @@
           </table>
         </div>
       </main>
+      </div>
     </div>
     <div id="toast-root" class="fixed top-4 right-4 z-50 space-y-2"></div>
     <script type="module" src="./reimpresion.js"></script>

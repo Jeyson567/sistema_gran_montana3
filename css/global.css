@@ -28,6 +28,18 @@ body {
   padding: 0.65rem 1rem;
   font-weight: 600;
   transition: all 0.2s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  touch-action: manipulation;
+}
+
+button,
+[role="button"],
+a.sidebar-link {
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-primary {

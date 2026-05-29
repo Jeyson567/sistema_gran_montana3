@@ -6,13 +6,22 @@
     <title>Administración | GRAN MONTANA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
     <link rel="stylesheet" href="../../css/admin.css" />
     <link rel="stylesheet" href="../../css/tables.css" />
   </head>
-  <body class="bg-zinc-950 text-zinc-100 min-h-screen">
-    <div class="flex min-h-screen">
-      <aside id="sidebar" class="w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col shrink-0"></aside>
-      <div class="flex-1 flex flex-col min-w-0">
+  <body class="bg-zinc-950 text-zinc-100 min-h-screen app-body">
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <div class="app-shell">
+      <aside id="sidebar" class="app-sidebar"></aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <button type="button" id="sidebar-toggle" class="app-menu-btn" aria-expanded="false" aria-controls="sidebar">
+            <span aria-hidden="true">☰</span> Menú
+          </button>
+          <span class="app-topbar-title">Admin</span>
+        </header>
+      <div class="app-content flex-1 flex flex-col min-w-0">
         <header class="border-b border-zinc-800 bg-zinc-900/80 p-4">
           <p class="text-xs text-zinc-500 uppercase tracking-widest">Administración</p>
           <h1 class="text-xl font-bold">GRAN MONTANA</h1>
@@ -35,7 +44,7 @@
           <h2 class="text-lg font-bold">Menú — Productos</h2>
           <button type="button" data-admin-action="producto:add" class="btn-primary">+ Agregar producto</button>
         </div>
-        <div class="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+        <div class="table-scroll-wrap rounded-2xl border border-zinc-800 bg-zinc-900">
           <table class="admin-table">
             <thead>
               <tr>
@@ -58,7 +67,7 @@
           <h2 class="text-lg font-bold">Categorías del menú</h2>
           <button type="button" data-admin-action="categoria:add" class="btn-primary">+ Agregar categoría</button>
         </div>
-        <div class="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+        <div class="table-scroll-wrap rounded-2xl border border-zinc-800 bg-zinc-900">
           <table class="admin-table">
             <thead>
               <tr>
@@ -87,7 +96,7 @@
           <h2 class="text-lg font-bold">Inventario</h2>
           <button type="button" data-admin-action="inventario:add" class="btn-primary">+ Agregar producto inventario</button>
         </div>
-        <div class="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+        <div class="table-scroll-wrap rounded-2xl border border-zinc-800 bg-zinc-900">
           <table class="admin-table">
             <thead>
               <tr>
@@ -111,7 +120,7 @@
           <h2 class="text-lg font-bold">Usuarios del sistema</h2>
           <button type="button" data-admin-action="usuario:add" class="btn-primary">+ Agregar usuario</button>
         </div>
-        <div class="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+        <div class="table-scroll-wrap rounded-2xl border border-zinc-800 bg-zinc-900">
           <table class="admin-table">
             <thead>
               <tr>
@@ -130,7 +139,7 @@
       <section id="panel-reportes" class="admin-panel">
         <h2 class="text-lg font-bold mb-4">Reportes — ventas y propinas</h2>
         <div id="reportes-resumen" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6"></div>
-        <div class="overflow-x-auto rounded-2xl border border-zinc-800 bg-zinc-900">
+        <div class="table-scroll-wrap rounded-2xl border border-zinc-800 bg-zinc-900">
           <table class="admin-table">
             <thead>
               <tr>
@@ -158,6 +167,7 @@
         </article>
       </section>
         </main>
+      </div>
       </div>
     </div>
 

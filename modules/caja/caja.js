@@ -40,7 +40,7 @@ const renderMesasCobro = () => {
       <p class="text-sm text-zinc-400">Estado: ${m.estado}</p>
       <p class="text-sm">Mesero: ${escapeHtml(m.meseroAsignado || "—")}</p>
       <p class="text-xl text-orange-400 font-bold mt-2">${formatCurrency(m.total ?? 0)}</p>
-      <button type="button" class="btn-primary w-full mt-3" data-cobrar-mesa="${m.id}">Cobrar mesa</button>
+      <button type="button" class="btn-primary w-full mt-3 min-h-[48px]" data-cobrar-mesa="${m.id}">Cobrar mesa</button>
     </article>
   `
     )

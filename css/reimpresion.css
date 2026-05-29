@@ -2,6 +2,12 @@
   font-size: 0.9rem;
 }
 
+@media (max-width: 767px) {
+  .reimp-filters .grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .ticket-preview section {
   margin: 0 auto;
 }

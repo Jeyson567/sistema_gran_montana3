@@ -6,18 +6,28 @@
     <title>Cocina | GRAN MONTANA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="../../css/global.css" />
+    <link rel="stylesheet" href="../../css/layout.css" />
     <link rel="stylesheet" href="../../css/kitchen.css" />
   </head>
-  <body class="bg-black text-zinc-100 min-h-screen">
-    <div class="flex min-h-screen">
-      <aside id="sidebar" class="w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col shrink-0 hidden lg:flex"></aside>
-      <main class="flex-1 p-4 min-h-screen">
+  <body class="bg-black text-zinc-100 min-h-screen app-body">
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+    <div class="app-shell">
+      <aside id="sidebar" class="app-sidebar"></aside>
+      <div class="app-main">
+        <header class="app-topbar">
+          <button type="button" id="sidebar-toggle" class="app-menu-btn" aria-expanded="false" aria-controls="sidebar">
+            <span aria-hidden="true">☰</span> Menú
+          </button>
+          <span class="app-topbar-title">Cocina</span>
+        </header>
+      <main class="app-content flex-1 p-3 sm:p-4 min-h-0 overflow-auto">
         <header class="mb-4 flex flex-wrap justify-between items-center gap-2">
           <h1 class="text-3xl font-bold">Monitor Cocina</h1>
           <p id="kitchen-status" class="text-orange-400 font-semibold">0 pedidos</p>
         </header>
-        <section id="kitchen-board" class="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3"></section>
+        <section id="kitchen-board" class="kitchen-board"></section>
       </main>
+      </div>
     </div>
     <!-- Sonido opcional: coloque new-order.mp3 en /sounds/; si no existe, se usa pitido del sistema -->
     <audio id="new-order-sound" src="../../sounds/new-order.mp3" preload="auto"></audio>

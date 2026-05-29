@@ -7,10 +7,11 @@ export const closeModal = (wrapper) => {
 export const openModal = ({ title, content, size = "md" }) => {
   const maxW = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" }[size] ?? "max-w-lg";
   const wrapper = document.createElement("div");
-  wrapper.className = "modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 overflow-y-auto";
+  wrapper.className =
+    "modal-overlay fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 sm:p-4 overflow-y-auto";
   wrapper.setAttribute("role", "dialog");
   wrapper.innerHTML = `
-    <article class="w-full ${maxW} rounded-2xl bg-zinc-900 border border-zinc-800 p-5 my-4 shadow-2xl">
+    <article class="w-full max-h-[92dvh] overflow-y-auto ${maxW} rounded-2xl bg-zinc-900 border border-zinc-800 p-4 sm:p-5 my-4 shadow-2xl">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-lg font-bold">${title}</h3>
         <button type="button" class="btn-secondary" data-close-modal>Cerrar</button>

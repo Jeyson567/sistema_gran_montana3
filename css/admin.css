@@ -36,3 +36,18 @@
   gap: 0.5rem;
   align-items: end;
 }
+
+@media (max-width: 767px) {
+  .inventario-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-tab {
+    min-height: 44px;
+    padding: 0.5rem 0.85rem !important;
+  }
+
+  #admin-tabs {
+    gap: 0.35rem;
+  }
+}
