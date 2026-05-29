@@ -1,14 +1,26 @@
-﻿import { listenMesas, listenVentas, cobrarMesaConTicket } from "../../firebase/firestore.js";
+﻿import {
+  listenMesas,
+  listenVentas,
+  listenProductos,
+  cobrarMesaConTicket,
+  anularVenta
+} from "../../firebase/firestore.js";
 import { protectModule } from "../../js/guard.js";
 import { buildSidebar } from "../../components/sidebar.js";
 import { openFormModal } from "../../components/modal.js";
 import { formatCurrency, escapeHtml, toNumber, normalizeRecord } from "../../js/helpers.js";
 import { alertSuccess, alertError } from "../../js/alerts.js";
-import { getCurrentProfile } from "../../js/guard.js";
 import { printTicket } from "../../js/print-ticket.js";
+import {
+  descuentosMenuCarrito,
+  descontarInventarioItems,
+  reembolsarInventarioItems,
+  snapshotInventarioVenta
+} from "../../js/inventario-refund.js";
 
 let mesasCache = [];
 let ventasCache = [];
+let productosCache = [];
 let profileCache = null;
 
 const nowParts = () => {
@@ -17,6 +29,15 @@ const nowParts = () => {
     fecha: d.toLocaleDateString("es-GT"),
     hora: d.toLocaleTimeString("es-GT", { hour: "2-digit", minute: "2-digit" })
   };
+};
+
+const estadoVentaClass = (estado) => {
+  const map = {
+    pagado: "text-green-400",
+    reembolsado: "text-yellow-400",
+    anulado: "text-red-400"
+  };
+  return map[estado] ?? "text-zinc-400";
 };
 
 const renderMesasCobro = () => {
@@ -52,13 +73,15 @@ const renderHistorial = () => {
   if (!tbody) return;
 
   if (!ventasCache.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-zinc-500">Sin ventas registradas</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-zinc-500">Sin ventas registradas</td></tr>`;
     return;
   }
 
   tbody.innerHTML = ventasCache
-    .map(
-      (v) => `
+    .map((v) => {
+      const estado = v.estado ?? "pagado";
+      const puedeAnular = estado === "pagado";
+      return `
     <tr class="border-b border-zinc-800">
       <td class="p-3 font-mono">${escapeHtml(v.ticket ?? "")}</td>
       <td class="p-3">${escapeHtml(v.mesa ?? "")}</td>
@@ -66,13 +89,47 @@ const renderHistorial = () => {
       <td class="p-3 text-right">${formatCurrency(v.propina ?? 0)}</td>
       <td class="p-3 text-right font-bold">${formatCurrency(v.total ?? 0)}</td>
       <td class="p-3">${escapeHtml(v.metodoPago ?? "")}</td>
-      <td class="p-3">
-        <button type="button" class="btn-secondary text-xs" data-reprint="${v.id}">Reimprimir</button>
+      <td class="p-3 capitalize ${estadoVentaClass(estado)}">${estado}</td>
+      <td class="p-3 whitespace-nowrap">
+        <button type="button" class="btn-secondary text-xs mr-1" data-reprint="${v.id}">Reimprimir</button>
+        ${puedeAnular ? `<button type="button" class="btn-danger text-xs" data-anular-venta="${v.id}">Anular</button>` : ""}
       </td>
     </tr>
-  `
-    )
+  `;
+    })
     .join("");
+};
+
+const openAnularVentaModal = (venta) => {
+  openFormModal({
+    title: `Anular venta — ${venta.ticket ?? ""}`,
+    size: "md",
+    submitLabel: "Confirmar anulación",
+    formHtml: `
+      <p class="text-zinc-400 text-sm">La venta pasará a <strong class="text-yellow-400">reembolsado</strong> y el inventario descontado será devuelto.</p>
+      <div>
+        <label class="block text-sm mb-1">Motivo</label>
+        <textarea name="motivo" class="input-base min-h-[80px]" required placeholder="Motivo de la anulación..."></textarea>
+      </div>
+    `,
+    onSubmit: async (fd) => {
+      const motivo = String(fd.get("motivo") ?? "").trim();
+      if (!motivo) throw new Error("Indica el motivo");
+      const usuario = profileCache?.nombre ?? profileCache?.email ?? "caja";
+
+      const items = venta.inventarioDescuentos ?? [];
+      if (items.length) {
+        await reembolsarInventarioItems({
+          items,
+          usuario,
+          motivo: `Anulación ${venta.ticket}: ${motivo}`
+        });
+      }
+
+      await anularVenta({ ventaId: venta.id, motivo, usuario });
+      alertSuccess(`Venta ${venta.ticket} anulada — inventario reembolsado`);
+    }
+  });
 };
 
 const openCobroModal = (mesa) => {
@@ -110,15 +167,30 @@ const openCobroModal = (mesa) => {
       const metodoPago = fd.get("metodoPago");
       const { fecha, hora } = nowParts();
       const mesero = m.meseroAsignado || profileCache?.nombre || "—";
+      const usuario = profileCache?.nombre ?? profileCache?.email ?? "caja";
+      const carrito = m.carrito ?? [];
+
+      const inventarioDescuentos = snapshotInventarioVenta(carrito, productosCache);
+      const menuDescuentos = descuentosMenuCarrito(carrito, productosCache);
+
+      if (menuDescuentos.length) {
+        await descontarInventarioItems({
+          items: menuDescuentos,
+          usuario,
+          motivo: `Venta mesa ${m.numero ?? m.id}`,
+          tipoMovimiento: "salida"
+        });
+      }
 
       const ventaPayload = {
         mesa: m.numero ?? m.id,
+        mesaId: m.id,
         mesero,
         fecha,
         hora,
         productos:
-          (Array.isArray(m.carrito) && m.carrito.length
-            ? m.carrito.map((l) => ({
+          (Array.isArray(carrito) && carrito.length
+            ? carrito.map((l) => ({
                 nombre: l.esAdicional ? `${l.nombre} [Adicional]` : l.nombre,
                 cantidad: l.cantidad ?? 1,
                 subtotal: l.subtotal ?? l.precio ?? 0,
@@ -126,6 +198,7 @@ const openCobroModal = (mesa) => {
                 esAdicional: !!l.esAdicional
               }))
             : null) ?? [{ nombre: "Consumo", cantidad: 1, subtotal: sub }],
+        inventarioDescuentos,
         subtotal: sub,
         propina,
         total,
@@ -167,11 +240,17 @@ document.getElementById("cashier-list")?.addEventListener("click", (e) => {
 });
 
 document.getElementById("historial-ventas")?.addEventListener("click", (e) => {
-  const id = e.target.closest("[data-reprint]")?.dataset.reprint;
+  const reprintId = e.target.closest("[data-reprint]")?.dataset.reprint;
+  const anularId = e.target.closest("[data-anular-venta]")?.dataset.anularVenta;
+  const id = reprintId || anularId;
   if (!id) return;
   const venta = ventasCache.find((v) => v.id === id);
-  if (venta) printTicket(venta);
-  else alertError("Venta no encontrada");
+  if (!venta) {
+    alertError("Venta no encontrada");
+    return;
+  }
+  if (reprintId) printTicket(venta);
+  if (anularId) openAnularVentaModal(venta);
 });
 
 protectModule("caja", (profile) => {
@@ -182,6 +261,10 @@ protectModule("caja", (profile) => {
   listenMesas((items) => {
     mesasCache = items.filter(Boolean);
     renderMesasCobro();
+  });
+
+  listenProductos((items) => {
+    productosCache = items.filter(Boolean);
   });
 
   listenVentas((items) => {

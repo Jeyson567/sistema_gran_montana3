@@ -2,6 +2,10 @@
   animation: kitchenIn 0.35s ease;
 }
 
+.kitchen-tab {
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
 @keyframes kitchenIn {
   from {
     opacity: 0;

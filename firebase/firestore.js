@@ -95,7 +95,7 @@ export const saveMesa = async (id, payload) => {
 
 export const removeMesa = async (id) => deleteDoc(doc(db, colecciones.mesas, id));
 
-/** Cocina: sin índice compuesto — filtra y ordena en cliente */
+/** Cocina: pendiente, preparando, listo (excluye entregado y cancelado) */
 export const listenPedidosCocina = (callback) => {
   const estadosActivos = new Set(["pendiente", "preparando", "listo"]);
   return snapshotListener("pedidos", collection(db, colecciones.pedidos), (items) => {
@@ -124,7 +124,22 @@ export const getMesa = async (mesaId) => {
 export const updatePedidoEstado = async (pedidoId, estado) => {
   const pedidoRef = doc(db, colecciones.pedidos, pedidoId);
   const pedidoSnap = await getDoc(pedidoRef);
-  await updateDoc(pedidoRef, { estado });
+
+  const extra =
+    estado === "listo"
+      ? {
+          horaListo: new Date().toLocaleTimeString("es-GT"),
+          fechaListo: new Date().toLocaleDateString("es-GT"),
+          timestampListo: Date.now()
+        }
+      : estado === "entregado"
+        ? {
+            horaEntregado: new Date().toLocaleTimeString("es-GT"),
+            fechaEntregado: new Date().toLocaleDateString("es-GT")
+          }
+        : {};
+
+  await updateDoc(pedidoRef, { estado, ...extra });
 
   if (!pedidoSnap.exists()) return;
 
@@ -152,6 +167,63 @@ export const updatePedidoEstado = async (pedidoId, estado) => {
   await updateDoc(mesaRef, { carrito: carritoActualizado });
 };
 
+export const cancelarPedidosActivosMesa = async (mesaId, motivo) => {
+  const snap = await getDocs(query(collection(db, colecciones.pedidos), where("mesaId", "==", mesaId)));
+  const activos = new Set(["pendiente", "preparando", "listo"]);
+  const updates = snap.docs
+    .filter((d) => activos.has(d.data()?.estado))
+    .map((d) =>
+      updateDoc(d.ref, {
+        estado: "cancelado",
+        motivoCancelacion: motivo,
+        canceladoEn: new Date().toISOString()
+      })
+    );
+  await Promise.all(updates);
+};
+
+export const cancelarMesa = async ({ mesaId, motivo, usuario }) => {
+  const mesa = await getMesa(mesaId);
+  if (!mesa) throw new Error("Mesa no encontrada");
+
+  await cancelarPedidosActivosMesa(mesaId, motivo);
+
+  const ahora = new Date();
+  await updateMesa(mesaId, {
+    estado: "libre",
+    carrito: [],
+    total: 0,
+    meseroAsignado: "",
+    notasPedido: "",
+    fechaApertura: null,
+    ultimoEnvioCocina: null,
+    cancelacion: {
+      motivo,
+      usuario,
+      fecha: ahora.toLocaleDateString("es-GT"),
+      hora: ahora.toLocaleTimeString("es-GT")
+    }
+  });
+};
+
+export const anularVenta = async ({ ventaId, motivo, usuario }) => {
+  const venta = await getVentaById(ventaId);
+  if (!venta) throw new Error("Venta no encontrada");
+  if (venta.estado === "reembolsado") throw new Error("Esta venta ya fue reembolsada");
+  if (venta.estado === "anulado") throw new Error("Esta venta ya está anulada");
+
+  const ahora = new Date();
+  await updateDoc(doc(db, colecciones.ventas, ventaId), {
+    estado: "reembolsado",
+    motivoReembolso: motivo,
+    reembolsadoPor: usuario,
+    fechaReembolso: ahora.toLocaleDateString("es-GT"),
+    horaReembolso: ahora.toLocaleTimeString("es-GT")
+  });
+
+  return venta;
+};
+
 export const getProductosDisponibles = async () => {
   const snap = await getDocs(query(collection(db, colecciones.productos), where("disponible", "==", true), orderBy("nombre", "asc")));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -170,7 +242,14 @@ export const cobrarMesaConTicket = async ({ mesaId, ventaPayload }) => {
 
     tx.set(ticketRef, { ultimoTicket: correlativo }, { merge: true });
     tx.set(ventaRef, { ...ventaPayload, ticket, correlativo, fechaRegistro: serverTimestamp() });
-    tx.update(mesaRef, { estado: "pagada", total: 0, fechaApertura: null });
+    tx.update(mesaRef, {
+      estado: "libre",
+      total: 0,
+      carrito: [],
+      meseroAsignado: "",
+      notasPedido: "",
+      fechaApertura: null
+    });
 
     return { ticket, correlativo, ventaId: ventaRef.id };
   });
@@ -252,7 +331,7 @@ export const ajustarStockInventario = async ({
 
   const actual = snapData.stock ?? 0;
   let nuevo = actual;
-  if (tipoMovimiento === "entrada") nuevo = actual + cantidad;
+  if (tipoMovimiento === "entrada" || tipoMovimiento === "reembolso") nuevo = actual + cantidad;
   else if (tipoMovimiento === "salida") nuevo = actual - cantidad;
   else nuevo = cantidad;
 

@@ -38,7 +38,7 @@ service cloud.firestore {
 
     match /pedidos/{docId} {
       allow read: if auth();
-      allow create, update: if esAdmin() || esMesero() || esCocina();
+      allow create, update: if esAdmin() || esMesero() || esCocina() || esCaja();
       allow delete: if esAdmin();
     }
 

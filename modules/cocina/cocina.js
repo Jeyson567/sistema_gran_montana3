@@ -8,6 +8,7 @@ const board = document.getElementById("kitchen-board");
 const statusEl = document.getElementById("kitchen-status");
 let pedidosCache = [];
 let knownPedidoIds = new Set();
+let tabActiva = "proceso";
 
 const playNewOrderSound = () => {
   const audio = document.getElementById("new-order-sound");
@@ -47,6 +48,11 @@ const estadoBadge = (estado) => {
   return colors[estado] ?? "bg-zinc-600";
 };
 
+const pedidosProceso = () =>
+  pedidosCache.filter((p) => p.estado === "pendiente" || p.estado === "preparando");
+
+const pedidosListos = () => pedidosCache.filter((p) => p.estado === "listo");
+
 const renderProductos = (productos = []) => {
   if (!productos.length) return `<p class="text-zinc-500 text-sm">Sin detalle de productos</p>`;
   return productos
@@ -66,51 +72,92 @@ const renderProductos = (productos = []) => {
     .join("");
 };
 
+const renderCard = (p, modo) => {
+  const badge = estadoBadge(p.estado);
+  const agregado = p.esAgregado
+    ? '<p class="text-yellow-400 text-sm font-bold uppercase tracking-wide mb-1">Nuevo agregado</p>'
+    : "";
+  const horaListo =
+    modo === "listos"
+      ? `<p class="text-green-400 text-sm font-semibold mt-1">Listo: ${escapeHtml(p.horaListo ?? p.hora ?? "—")}</p>`
+      : "";
+
+  const botones =
+    modo === "listos"
+      ? `<button type="button" class="btn-secondary w-full py-3 min-h-[48px]" data-pedido-id="${p.id}" data-next="entregado">Entregado</button>`
+      : `
+        <div class="flex flex-wrap gap-2">
+          ${p.estado === "pendiente" ? `<button type="button" class="btn-secondary flex-1 py-3 min-h-[48px]" data-pedido-id="${p.id}" data-next="preparando">Preparando</button>` : ""}
+          <button type="button" class="btn-primary flex-1 py-3 min-h-[48px]" data-pedido-id="${p.id}" data-next="listo">Listo</button>
+        </div>`;
+
+  return `
+    <article class="kitchen-card rounded-2xl border-2 border-zinc-700 bg-zinc-900 p-5 ${p.estado === "pendiente" ? "ring-2 ring-orange-500" : ""} ${modo === "listos" ? "border-green-700/50" : ""}">
+      <div class="flex justify-between items-start gap-2 mb-3">
+        <div>
+          ${agregado}
+          <h3 class="text-2xl font-bold">${escapeHtml(p.mesa ?? "Mesa")}</h3>
+          <p class="text-zinc-400 text-sm">${escapeHtml(p.hora ?? "")} · ${escapeHtml(p.fecha ?? "")}</p>
+          ${horaListo}
+        </div>
+        <span class="${badge} px-3 py-1 rounded-lg text-xs font-bold uppercase">${p.estado}</span>
+      </div>
+      <p class="text-sm text-zinc-300 mb-2">Mesero: <strong>${escapeHtml(p.mesero ?? "—")}</strong></p>
+      ${p.notas ? `<p class="text-yellow-300 text-sm mb-3 p-2 bg-yellow-500/10 rounded-lg">Nota: ${escapeHtml(p.notas)}</p>` : ""}
+      <ul class="mb-4 max-h-48 overflow-y-auto">${renderProductos(p.productos)}</ul>
+      ${botones}
+    </article>
+  `;
+};
+
 const renderBoard = () => {
   if (!board) return;
 
+  const enProceso = pedidosProceso();
+  const listos = pedidosListos();
+  const lista = tabActiva === "listos" ? listos : enProceso;
+
+  document.getElementById("kitchen-tab-proceso-count")?.replaceChildren(
+    document.createTextNode(String(enProceso.length))
+  );
+  document.getElementById("kitchen-tab-listos-count")?.replaceChildren(
+    document.createTextNode(String(listos.length))
+  );
+
   if (statusEl) {
-    statusEl.textContent = `${pedidosCache.length} pedido(s) activo(s)`;
+    statusEl.textContent =
+      tabActiva === "listos"
+        ? `${listos.length} listo(s)`
+        : `${enProceso.length} en proceso`;
   }
 
-  if (!pedidosCache.length) {
+  if (!lista.length) {
     board.innerHTML = `
       <p class="col-span-full text-center text-zinc-500 text-xl py-20">
-        Esperando pedidos...<br/>
-        <span class="text-sm">Los pedidos enviados desde Mesas aparecerán aquí al instante.</span>
+        ${tabActiva === "listos" ? "No hay pedidos listos." : "Sin pedidos en preparación."}<br/>
+        <span class="text-sm">${tabActiva === "listos" ? "Los pedidos marcados como Listo aparecerán aquí." : "Los nuevos pedidos desde Mesas aparecerán al instante."}</span>
       </p>`;
     return;
   }
 
-  board.innerHTML = pedidosCache
-    .map((p) => {
-      const badge = estadoBadge(p.estado);
-      const agregado = p.esAgregado
-        ? '<p class="text-yellow-400 text-sm font-bold uppercase tracking-wide mb-1">Nuevo agregado</p>'
-        : "";
-      return `
-        <article class="kitchen-card rounded-2xl border-2 border-zinc-700 bg-zinc-900 p-5 ${p.estado === "pendiente" ? "ring-2 ring-orange-500" : ""}">
-          <div class="flex justify-between items-start gap-2 mb-3">
-            <div>
-              ${agregado}
-              <h3 class="text-2xl font-bold">${escapeHtml(p.mesa ?? "Mesa")}</h3>
-              <p class="text-zinc-400 text-sm">${escapeHtml(p.hora ?? "")} · ${escapeHtml(p.fecha ?? "")}</p>
-            </div>
-            <span class="${badge} px-3 py-1 rounded-lg text-xs font-bold uppercase">${p.estado}</span>
-          </div>
-          <p class="text-sm text-zinc-300 mb-2">Mesero: <strong>${escapeHtml(p.mesero ?? "—")}</strong></p>
-          ${p.notas ? `<p class="text-yellow-300 text-sm mb-3 p-2 bg-yellow-500/10 rounded-lg">Nota: ${escapeHtml(p.notas)}</p>` : ""}
-          <ul class="mb-4 max-h-48 overflow-y-auto">${renderProductos(p.productos)}</ul>
-          <div class="flex flex-wrap gap-2">
-            ${p.estado === "pendiente" ? `<button type="button" class="btn-secondary flex-1 py-3" data-pedido-id="${p.id}" data-next="preparando">Preparando</button>` : ""}
-            ${p.estado !== "listo" ? `<button type="button" class="btn-primary flex-1 py-3" data-pedido-id="${p.id}" data-next="listo">Listo</button>` : ""}
-            ${p.estado === "listo" ? `<button type="button" class="btn-secondary flex-1 py-3" data-pedido-id="${p.id}" data-next="entregado">Entregado</button>` : ""}
-          </div>
-        </article>
-      `;
-    })
-    .join("");
+  board.innerHTML = lista.map((p) => renderCard(p, tabActiva === "listos" ? "listos" : "proceso")).join("");
 };
+
+const setTab = (tab) => {
+  tabActiva = tab;
+  document.querySelectorAll("[data-kitchen-tab]").forEach((btn) => {
+    const active = btn.dataset.kitchenTab === tab;
+    btn.classList.toggle("kitchen-tab-active", active);
+    btn.classList.toggle("bg-orange-600", active);
+    btn.classList.toggle("text-white", active);
+    btn.classList.toggle("bg-zinc-800", !active);
+  });
+  renderBoard();
+};
+
+document.querySelectorAll("[data-kitchen-tab]")?.forEach((btn) => {
+  btn.addEventListener("click", () => setTab(btn.dataset.kitchenTab));
+});
 
 board?.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-pedido-id]");
@@ -120,6 +167,7 @@ board?.addEventListener("click", async (e) => {
   if (!id || !next) return;
   try {
     await updatePedidoEstado(id, next);
+    if (next === "listo") setTab("listos");
     alertSuccess(`Pedido → ${next}`);
   } catch (error) {
     console.error("[cocina] Error estado:", error);
@@ -129,7 +177,7 @@ board?.addEventListener("click", async (e) => {
 
 protectModule("cocina", (profile) => {
   buildSidebar(profile.rol);
-  console.log("[cocina] Iniciando listener pedidos...");
+  setTab("proceso");
 
   listenPedidosCocina((pedidos) => {
     const nuevos = pedidos.filter((p) => !knownPedidoIds.has(p.id) && p.estado === "pendiente");

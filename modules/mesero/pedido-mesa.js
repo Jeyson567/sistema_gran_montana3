@@ -4,10 +4,13 @@ import {
   listenInventario,
   updateMesa,
   savePedido,
-  ajustarStockInventario
+  ajustarStockInventario,
+  cancelarMesa
 } from "../../firebase/firestore.js";
 import { openFormModal } from "../../components/modal.js";
 import { formatCurrency, escapeHtml, safeText, toNumber, normalizeRecord } from "../../js/helpers.js";
+import { reembolsarInventarioCarritoMesa } from "../../js/inventario-refund.js";
+import { isAdminRole } from "../../firebase/permissions.js";
 import {
   newLineaId,
   normalizarCarrito,
@@ -47,14 +50,12 @@ const norm = (s) =>
 const syncMesaFirestore = async () => {
   if (!mesaActiva?.id) return;
   const total = calcularTotal(carrito);
-  await updateMesa(mesaActiva.id, {
-    carrito,
-    total,
-    estado: mesaActiva.estado === "libre" ? "ocupada" : mesaActiva.estado,
-    meseroAsignado: profileActivo?.nombre ?? mesaActiva.meseroAsignado ?? "",
-    fechaApertura: mesaActiva.fechaApertura ?? new Date().toISOString()
-  });
-  mesaActiva = { ...mesaActiva, carrito, total, estado: mesaActiva.estado === "libre" ? "ocupada" : mesaActiva.estado };
+  const payload = { carrito, total };
+  if (mesaActiva.estado !== "libre") {
+    payload.meseroAsignado = profileActivo?.nombre ?? mesaActiva.meseroAsignado ?? "";
+  }
+  await updateMesa(mesaActiva.id, payload);
+  mesaActiva = { ...mesaActiva, carrito, total };
 };
 
 const renderHeader = () => {
@@ -342,18 +343,61 @@ export const abrirVistaPedido = (mesa, profile) => {
   const notasEl = document.getElementById("pedido-notas-mesa");
   if (notasEl) notasEl.value = mesaActiva.notasPedido ?? "";
 
-  if (mesaActiva.estado === "libre") {
-    mesaActiva.estado = "ocupada";
-    mesaActiva.meseroAsignado = profile?.nombre ?? "";
-    mesaActiva.fechaApertura = new Date().toISOString();
-    syncMesaFirestore().catch(() => {});
-  }
-
   renderHeader();
   renderLineas();
   renderCategorias();
   renderProductosMenu();
+  renderCancelarMesaBtn();
   mostrarPedido();
+};
+
+const puedeCancelarMesa = (profile) => {
+  const rol = String(profile?.rol ?? "").toLowerCase();
+  return isAdminRole(rol) || rol === "caja" || rol === "mesero";
+};
+
+const renderCancelarMesaBtn = () => {
+  const btn = document.getElementById("btn-cancelar-mesa");
+  if (!btn) return;
+  const show = puedeCancelarMesa(profileActivo);
+  btn.classList.toggle("hidden", !show);
+};
+
+const openCancelarMesaModal = () => {
+  if (!mesaActiva?.id) return;
+  openFormModal({
+    title: `Cancelar — ${mesaActiva.numero ?? "Mesa"}`,
+    size: "md",
+    submitLabel: "Confirmar cancelación",
+    formHtml: `
+      <p class="text-zinc-400 text-sm">Se cerrará la mesa, se limpiará el pedido y se devolverá el inventario descontado.</p>
+      <div>
+        <label class="block text-sm mb-1">Motivo de cancelación</label>
+        <textarea name="motivo" class="input-base min-h-[80px]" required placeholder="Ej: cliente se retiró, error en pedido..."></textarea>
+      </div>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="confirmar" required class="mt-1" />
+        <span>Confirmo que deseo cancelar esta mesa</span>
+      </label>
+    `,
+    onSubmit: async (fd) => {
+      const motivo = safeText(fd.get("motivo"));
+      if (!motivo) throw new Error("Indica el motivo de cancelación");
+      const usuario = profileActivo?.nombre ?? profileActivo?.email ?? "usuario";
+
+      await reembolsarInventarioCarritoMesa({
+        carrito,
+        usuario,
+        motivo: `Cancelación mesa ${mesaActiva.numero}: ${motivo}`
+      });
+      await cancelarMesa({ mesaId: mesaActiva.id, motivo, usuario });
+
+      carrito = [];
+      mesaActiva = null;
+      alertSuccess("Mesa cancelada");
+      onVolverCallback?.();
+    }
+  });
 };
 
 const enviarCocina = async () => {
@@ -400,10 +444,18 @@ const enviarCocina = async () => {
     carrito,
     total: calcularTotal(carrito),
     estado: "ocupada",
+    meseroAsignado: profileActivo?.nombre ?? mesaActiva.meseroAsignado ?? "",
+    fechaApertura: mesaActiva.fechaApertura ?? new Date().toISOString(),
     notasPedido: safeText(notasMesa),
     ultimoEnvioCocina: new Date().toISOString()
   });
-  mesaActiva = { ...mesaActiva, carrito, total: calcularTotal(carrito) };
+  mesaActiva = {
+    ...mesaActiva,
+    carrito,
+    total: calcularTotal(carrito),
+    estado: "ocupada",
+    meseroAsignado: profileActivo?.nombre ?? mesaActiva.meseroAsignado ?? ""
+  };
 
   renderLineas();
   const n = pendientes.length;
@@ -512,5 +564,9 @@ export const initPedidoMesa = ({ profile, onVolver }) => {
 
   document.getElementById("btn-cobrar-mesa")?.addEventListener("click", () => {
     irCobrar().catch((err) => alertError(err.message));
+  });
+
+  document.getElementById("btn-cancelar-mesa")?.addEventListener("click", () => {
+    openCancelarMesaModal();
   });
 };
