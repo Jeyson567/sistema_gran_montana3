@@ -239,7 +239,7 @@ const inventarioSelectHtml = (selectedId = "") => {
         `<option value="${item.id}" ${item.id === selectedId ? "selected" : ""}>${escapeHtml(item.nombre)} (stock: ${item.stock ?? 0})</option>`
     )
     .join("");
-  return `<select name="inventarioId" class="input-base" required><option value="">— Seleccionar —</option>${opts}</select>`;
+  return `<select name="inventarioId" class="input-base" data-inv-select><option value="">— Seleccionar —</option>${opts}</select>`;
 };
 
 const openProductoAdicionalModal = () => {
@@ -304,14 +304,18 @@ const openProductoAdicionalModal = () => {
         const inventarioId = fd.get("inventarioId");
         const cantidadInv = Math.max(0.01, toNumber(fd.get("cantidadInventario"), 1));
         if (!inventarioId) throw new Error("Selecciona un producto de inventario");
-        await ajustarStockInventario({
-          inventarioId,
-          cantidad: cantidadInv,
-          tipoMovimiento: "salida",
-          motivo: `Adicional mesa ${mesaActiva?.numero ?? ""}: ${nombre}`,
-          usuario: profileActivo?.nombre ?? profileActivo?.email ?? "mesero"
-        });
-        linea.inventarioDescuento = { inventarioId, cantidad: cantidadInv };
+        try {
+          await ajustarStockInventario({
+            inventarioId,
+            cantidad: cantidadInv,
+            tipoMovimiento: "salida",
+            motivo: `Adicional mesa ${mesaActiva?.numero ?? ""}: ${nombre}`,
+            usuario: profileActivo?.nombre ?? profileActivo?.email ?? "mesero"
+          });
+          linea.inventarioDescuento = { inventarioId, cantidad: cantidadInv };
+        } catch (err) {
+          console.warn("[pedido] Inventario adicional no descontado (producto igual se agregó):", err);
+        }
       }
 
       carrito.push(linea);
@@ -324,9 +328,17 @@ const openProductoAdicionalModal = () => {
   setTimeout(() => {
     const toggle = document.querySelector("[data-toggle-inv]");
     const section = document.querySelector("[data-inv-fields]");
-    toggle?.addEventListener("change", () => {
-      section?.classList.toggle("hidden", toggle.value !== "si");
-    });
+    const invSelect = document.querySelector("[data-inv-select]");
+    const invCantidad = document.querySelector("[name=cantidadInventario]");
+
+    const refreshInv = () => {
+      const si = toggle?.value === "si";
+      section?.classList.toggle("hidden", !si);
+      if (invSelect) invSelect.required = si;
+      if (invCantidad) invCantidad.required = si;
+    };
+    toggle?.addEventListener("change", refreshInv);
+    refreshInv();
   }, 30);
 };
 
@@ -388,7 +400,8 @@ const openCancelarMesaModal = () => {
       await reembolsarInventarioCarritoMesa({
         carrito,
         usuario,
-        motivo: `Cancelación mesa ${mesaActiva.numero}: ${motivo}`
+        motivo: `Cancelación mesa ${mesaActiva.numero}: ${motivo}`,
+        inventarioItems: inventarioItems
       });
       await cancelarMesa({ mesaId: mesaActiva.id, motivo, usuario });
 

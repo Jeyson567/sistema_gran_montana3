@@ -2,6 +2,7 @@
   listenMesas,
   listenVentas,
   listenProductos,
+  listenInventario,
   cobrarMesaConTicket,
   anularVenta
 } from "../../firebase/firestore.js";
@@ -21,6 +22,7 @@ import {
 let mesasCache = [];
 let ventasCache = [];
 let productosCache = [];
+let inventarioCache = [];
 let profileCache = null;
 
 const nowParts = () => {
@@ -119,11 +121,15 @@ const openAnularVentaModal = (venta) => {
 
       const items = venta.inventarioDescuentos ?? [];
       if (items.length) {
-        await reembolsarInventarioItems({
+        const { fallos } = await reembolsarInventarioItems({
           items,
           usuario,
-          motivo: `Anulación ${venta.ticket}: ${motivo}`
+          motivo: `Anulación ${venta.ticket}: ${motivo}`,
+          inventarioItems: inventarioCache
         });
+        if (fallos?.length) {
+          console.warn("[caja] Reembolso parcial de inventario:", fallos);
+        }
       }
 
       await anularVenta({ ventaId: venta.id, motivo, usuario });
@@ -170,17 +176,11 @@ const openCobroModal = (mesa) => {
       const usuario = profileCache?.nombre ?? profileCache?.email ?? "caja";
       const carrito = m.carrito ?? [];
 
-      const inventarioDescuentos = snapshotInventarioVenta(carrito, productosCache);
-      const menuDescuentos = descuentosMenuCarrito(carrito, productosCache);
-
-      if (menuDescuentos.length) {
-        await descontarInventarioItems({
-          items: menuDescuentos,
-          usuario,
-          motivo: `Venta mesa ${m.numero ?? m.id}`,
-          tipoMovimiento: "salida"
-        });
-      }
+      const inventarioDescuentos = snapshotInventarioVenta(
+        carrito,
+        productosCache,
+        inventarioCache
+      );
 
       const ventaPayload = {
         mesa: m.numero ?? m.id,
@@ -209,6 +209,24 @@ const openCobroModal = (mesa) => {
       const result = await cobrarMesaConTicket({ mesaId: m.id, ventaPayload });
       const ventaImpresion = { ...ventaPayload, ticket: result.ticket, correlativo: result.correlativo };
       printTicket(ventaImpresion);
+
+      const menuDescuentos = descuentosMenuCarrito(carrito, productosCache, inventarioCache);
+      if (menuDescuentos.length) {
+        const { ok, fallos } = await descontarInventarioItems({
+          items: menuDescuentos,
+          usuario,
+          motivo: `Venta mesa ${m.numero ?? m.id}`,
+          tipoMovimiento: "salida",
+          inventarioItems: inventarioCache
+        });
+        if (fallos.length) {
+          console.warn("[caja] Inventario no descontado por completo (venta ya registrada):", fallos);
+        }
+        if (ok === 0 && fallos.length) {
+          console.warn("[caja] Ningún ítem de inventario del menú pudo descontarse. Revise inventarioConfig (nombre vs ID).");
+        }
+      }
+
       alertSuccess(`Cobrado ${result.ticket}`);
     }
   });
@@ -265,6 +283,10 @@ protectModule("caja", (profile) => {
 
   listenProductos((items) => {
     productosCache = items.filter(Boolean);
+  });
+
+  listenInventario((items) => {
+    inventarioCache = items.filter(Boolean);
   });
 
   listenVentas((items) => {
